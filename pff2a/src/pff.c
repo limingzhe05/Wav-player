@@ -26,7 +26,6 @@
 #include "diskio.h"		/* Declarations of low level disk I/O functions */
 
 
-
 /*--------------------------------------------------------------------------
 
    Module Private Definitions
@@ -241,6 +240,9 @@
 
 #define IsUpper(c)	(((c)>='A')&&((c)<='Z'))
 #define IsLower(c)	(((c)>='a')&&((c)<='z'))
+#define IsDigit(c)	(((c)>='0')&&((c)<='9'))
+
+
 
 #if _DF1S		/* DBCS configuration */
 
@@ -355,7 +357,9 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 	CLUST clst	/* Cluster# to get the link information */
 )
 {
+#if _FS_FAT12
 	WORD wc, bc, ofs;
+#endif
 	BYTE buf[4];
 	FATFS *fs = FatFs;
 
@@ -379,11 +383,11 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 #endif
 	case FS_FAT16 :
 		if (disk_readp(buf, fs->fatbase + clst / 256, (WORD)(((WORD)clst % 256) * 2), 2)) break;
-		return LD_WORD(buf);
+		return LD_WORD(buf); 
 #if _FS_FAT32
 	case FS_FAT32 :
 		if (disk_readp(buf, fs->fatbase + clst / 128, (WORD)(((WORD)clst % 128) * 4), 4)) break;
-		return LD_DWORD(buf) & 0x0FFFFFFF;
+		return LD_DWORD(buf) & 0x0FFFFFFF;//(((DWORD)buf[3]<<24)|((DWORD)buf[2]<<16)|((DWORD)buf[1]<<8)|((DWORD)buf[0])) & 0x0FFFFFFF;//LD_DWORD(buf) & 0x0FFFFFFF;
 #endif
 	}
 
@@ -740,12 +744,14 @@ FRESULT pf_mount (
 {
 	BYTE fmt, buf[36];
 	DWORD bsect, fsize, tsect, mclst;
+	BYTE resTest;
 
 
 	FatFs = 0;
 	if (!fs) return FR_OK;				/* Unregister fs object */
 
-	if (disk_initialize() & STA_NOINIT)	/* Check if the drive is ready or not */
+	resTest = disk_initialize() ;
+	if (resTest& STA_NOINIT)	/* Check if the drive is ready or not */
 		return FR_NOT_READY;
 
 	/* Search FAT partition on the drive */
@@ -1029,10 +1035,8 @@ fe_abort:
 }
 #endif
 
-
-
 /*-----------------------------------------------------------------------*/
-/* Create a Directroy Object                                             */
+/* Create a Directory Object                                             */
 /*-----------------------------------------------------------------------*/
 #if _USE_DIR
 
@@ -1067,9 +1071,6 @@ FRESULT pf_opendir (
 	return res;
 }
 
-
-
-
 /*-----------------------------------------------------------------------*/
 /* Read Directory Entry in Sequense                                      */
 /*-----------------------------------------------------------------------*/
@@ -1080,7 +1081,7 @@ FRESULT pf_readdir (
 )
 {
 	FRESULT res;
-	BYTE sp[12], dir[32];
+	BYTE sp[12], dir[32];  //32
 	FATFS *fs = FatFs;
 
 
@@ -1112,3 +1113,98 @@ FRESULT pf_readdir (
 
 #endif /* _USE_DIR */
 
+#if _USE_STRFUNC
+/*-----------------------------------------------------------------------*/
+/* Get a string from the file                                            */
+/*-----------------------------------------------------------------------*/
+#if _USE_READ
+CHAR* pf_gets (
+	CHAR* buff,	/* Pointer to the string buffer to read */
+	WORD len		/* Size of string buffer (characters) */
+	//FIL* fil		/* Pointer to the file object */
+)
+{
+	int n = 0;
+	CHAR c, *p = buff;
+	BYTE s[2];
+	WORD rc;
+	
+
+	while (n < len - 1) {			/* Read bytes until buffer gets filled */
+		pf_read(s, 1, &rc);
+		if (rc != 1) break;			/* Break on EOF or error */
+		c = s[0];
+
+#if _USE_STRFUNC >= 2
+		if (c == '\r') continue;	/* Strip '\r' */
+#endif
+		*p++ = c;
+		n++;
+		if (c == '\n') break;		/* Break on EOL */
+	}
+	*p = 0;
+	return n ? buff : 0;			/* When no data read (eof or error), return with error. */
+}
+#endif
+
+
+#if _USE_WRITE
+//#include <stdarg.h>
+/*-----------------------------------------------------------------------*/
+/* Put a character to the file                                           */
+/*-----------------------------------------------------------------------*/
+
+int pf_putc (
+	CHAR c	/* A character to be output */
+	//FIL* fil	/* Pointer to the file object */
+)
+{
+	WORD bw;//, btw;
+	
+	//BYTE s[3];
+	//char chr;	
+
+#if _USE_STRFUNC >= 2
+//	UINT res = 0;
+	if (c == '\n') pf_putc ('\r');	/* LF -> CRLF conversion */
+//		{
+//	    res = pf_putc ('\r');	/* LF -> CRLF conversion */
+//		if (res == 0) return EOF;
+//		}
+#endif
+
+	//c = (BYTE)c;
+
+	//pf_write(s, btw, &bw);		/* Write the char to the file */
+	pf_write(&c, 1, &bw);
+//	if(bw == 1){ return (bw + res);
+//		//if(res == 0) return 1;
+//		//else return 2;
+//		}
+//	else return EOF;
+
+	return (bw == 1) ? 1 : EOF;	/* Return the result */	
+}
+
+
+
+
+/*-----------------------------------------------------------------------*/
+/* Put a string to the file                                              */
+/*-----------------------------------------------------------------------*/
+int pf_puts (
+	const CHAR* str	/* Pointer to the string to be output */
+	//FIL* fil			/* Pointer to the file object */
+)
+{
+	int n;
+
+
+	for (n = 0; *str; str++, n++) {
+		if (pf_putc(*str) == EOF) return EOF;
+	}
+	return n;
+}
+
+#endif /* _USE_WRITE */
+#endif /* _USE_STRFUNC */

@@ -4,6 +4,10 @@
 
 #ifndef _DISKIO
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "integer.h"
 
 
@@ -23,7 +27,11 @@ typedef enum {
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
 
-DSTATUS disk_initialize (void);
+void attach_cs_pin (void (*cs_low)(void), void (*cs_high)(void), int (*cs_read)(void));
+void attach_dly100u (void (*dly100u)(void));
+void attach_SPIdriver(BYTE (*spi_receive)(void), BYTE (*spi_send)(BYTE));//, void (*spi_set_divider)(BYTE));
+
+DSTATUS disk_initialize ();
 DRESULT disk_readp (BYTE*, DWORD, WORD, WORD);
 DRESULT disk_writep (const BYTE*, DWORD);
 
@@ -38,4 +46,7 @@ DRESULT disk_writep (const BYTE*, DWORD);
 #define CT_BLOCK			0x08	/* Block addressing */
 
 #define _DISKIO
+#ifdef __cplusplus
+}
+#endif
 #endif

@@ -11,6 +11,7 @@
 #include <tchar.h>
 
 #else			/* Embedded platform */
+#include <stdint.h>
 
 /* These types must be 16-bit, 32-bit or larger integer */
 typedef int				INT;

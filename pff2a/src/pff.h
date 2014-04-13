@@ -13,56 +13,15 @@
 / * Redistributions of source code must retain the above copyright notice.
 /
 /----------------------------------------------------------------------------*/
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "integer.h"
+#include "pffconf.h"
 
-/*---------------------------------------------------------------------------/
-/ Petit FatFs Configuration Options
-/
-/ CAUTION! Do not forget to make clean the project after any changes to
-/ the configuration options.
-/
-/----------------------------------------------------------------------------*/
 #ifndef _FATFS
 #define _FATFS
-
-#define	_USE_READ	1	/* 1:Enable pf_read() */
-
-#define	_USE_DIR	0	/* 1:Enable pf_opendir() and pf_readdir() */
-
-#define	_USE_LSEEK	0	/* 1:Enable pf_lseek() */
-
-#define	_USE_WRITE	0	/* 1:Enable pf_write() */
-
-#define _FS_FAT12	1	/* 1:Enable FAT12 support */
-#define _FS_FAT32	0	/* 1:Enable FAT32 support */
-
-
-#define	_CODE_PAGE	1
-/* Defines which code page is used for path name. Supported code pages are:
-/  932, 936, 949, 950, 437, 720, 737, 775, 850, 852, 855, 857, 858, 862, 866,
-/  874, 1250, 1251, 1252, 1253, 1254, 1255, 1257, 1258 and 1 (ASCII only).
-/  SBCS code pages except for 1 requiers a case conversion table. This
-/  might occupy 128 bytes on the RAM on some platforms, e.g. avr-gcc. */
-
-
-#define _WORD_ACCESS	0
-/* The _WORD_ACCESS option defines which access method is used to the word
-/  data in the FAT structure.
-/
-/   0: Byte-by-byte access. Always compatible with all platforms.
-/   1: Word access. Do not choose this unless following condition is met.
-/
-/  When the byte order on the memory is big-endian or address miss-aligned
-/  word access results incorrect behavior, the _WORD_ACCESS must be set to 0.
-/  If it is not the case, the value can also be set to 1 to improve the
-/  performance and code efficiency. */
-
-
-/* End of configuration options. Do not change followings without care.     */
-/*--------------------------------------------------------------------------*/
-
-
 
 #if _FS_FAT32
 #define	CLUST	DWORD
@@ -70,9 +29,7 @@
 #define	CLUST	WORD
 #endif
 
-
 /* File system object structure */
-
 typedef struct {
 	BYTE	fs_type;	/* FAT sub type */
 	BYTE	flag;		/* File status flags */
@@ -90,10 +47,7 @@ typedef struct {
 	DWORD	dsect;		/* File current data sector */
 } FATFS;
 
-
-
 /* Directory object structure */
-
 typedef struct {
 	WORD	index;		/* Current read/write index number */
 	BYTE*	fn;			/* Pointer to the SFN (in/out) {file[8],ext[3],status[1]} */
@@ -102,10 +56,7 @@ typedef struct {
 	DWORD	sect;		/* Current sector */
 } DIR;
 
-
-
 /* File status structure */
-
 typedef struct {
 	DWORD	fsize;		/* File size */
 	WORD	fdate;		/* Last modified date */
@@ -115,9 +66,7 @@ typedef struct {
 } FILINFO;
 
 
-
 /* File function return code (FRESULT) */
-
 typedef enum {
 	FR_OK = 0,			/* 0 */
 	FR_DISK_ERR,		/* 1 */
@@ -129,18 +78,43 @@ typedef enum {
 	FR_NO_FILESYSTEM	/* 7 */
 } FRESULT;
 
-
-
-/*--------------------------------------------------------------*/
 /* Petit FatFs module application interface                     */
 
 FRESULT pf_mount (FATFS*);						/* Mount/Unmount a logical drive */
-FRESULT pf_open (const char*);					/* Open a file */
+FRESULT pf_open (const CHAR*);					/* Open a file */
+#if _USE_READ
 FRESULT pf_read (void*, WORD, WORD*);			/* Read data from the open file */
+#endif
+#if _USE_WRITE
 FRESULT pf_write (const void*, WORD, WORD*);	/* Write data to the open file */
+#endif
+#if _USE_LSEEK
 FRESULT pf_lseek (DWORD);						/* Move file pointer of the open file */
+#endif
+#if _USE_DIR
 FRESULT pf_opendir (DIR*, const char*);			/* Open a directory */
 FRESULT pf_readdir (DIR*, FILINFO*);			/* Read a directory item from the open directory */
+#endif
+
+#if _USE_STRFUNC
+#if _USE_READ
+CHAR* pf_gets (CHAR*, WORD);					/* Get a string from the file */
+#endif
+#if _USE_WRITE
+int pf_putc (CHAR);	//CHAR						/* Put a character to the file */
+int pf_puts (const CHAR*);					/* Put a string to the file */
+//int pf_printf ( const CHAR*, ...);				/* Put a formatted string to the file */
+#endif
+#endif
+//#define pf_eof(fp) (((fp)->fptr == (fp)->fsize) ? 1 : 0)
+//#define pf_error(fp) (((fp)->flag & FA__ERROR) ? 1 : 0)
+//#define pf_tell(fp) ((fp)->fptr)
+//#define pf_size(fp) ((fp)->fsize)
+
+#ifndef EOF
+#define EOF (-1)
+#endif
+
 
 
 
@@ -148,21 +122,17 @@ FRESULT pf_readdir (DIR*, FILINFO*);			/* Read a directory item from the open di
 /* Flags and offset address                                     */
 
 /* File status flag (FATFS.flag) */
-
 #define	FA_OPENED	0x01
 #define	FA_WPRT		0x02
 #define	FA__WIP		0x40
 
-
 /* FAT sub type (FATFS.fs_type) */
-
 #define FS_FAT12	1
 #define FS_FAT16	2
 #define FS_FAT32	3
 
 
 /* File attribute bits for directory entry */
-
 #define	AM_RDO	0x01	/* Read only */
 #define	AM_HID	0x02	/* Hidden */
 #define	AM_SYS	0x04	/* System */
@@ -171,7 +141,6 @@ FRESULT pf_readdir (DIR*, FILINFO*);			/* Read a directory item from the open di
 #define AM_DIR	0x10	/* Directory */
 #define AM_ARC	0x20	/* Archive */
 #define AM_MASK	0x3F	/* Mask of defined bits */
-
 
 /*--------------------------------*/
 /* Multi-byte word access macros  */
@@ -189,4 +158,9 @@ FRESULT pf_readdir (DIR*, FILINFO*);			/* Read a directory item from the open di
 #endif
 
 
+
 #endif /* _FATFS */
+//#endif /* _FATFS */
+#ifdef __cplusplus
+}
+#endif
