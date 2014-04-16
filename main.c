@@ -212,6 +212,19 @@ void fill_pwm_queue() {
  * main.c
  */
 
+void init_sample_timer(uint16_t freq) {
+	__disable_interrupt();
+
+    TACCTL0 = CCIE;
+    TACTL = TASSEL_2 + MC_1; // Set the timer A to SMCLCK, Continuous
+    // Clear the timer and enable timer interrupt
+
+    // 44.1kHz
+    TACCR0 = 16E6 / freq;
+
+    __enable_interrupt();
+}
+
 void init_play(char *fname) {
     // play
     wav_active = true;
@@ -236,6 +249,8 @@ void init_play(char *fname) {
 	fill_pwm_queue();
 
     pwm_start();
+
+    init_sample_timer(fmt.SampleRate);
 }
 
 bool play_loop(void) {
@@ -295,7 +310,7 @@ int main(void) {
     	__no_operation();
     }
 
-#if 1
+#if 0
     // test that sample sound can be loaded within time.
     led_on();
 
@@ -320,6 +335,25 @@ int main(void) {
     led_off();
 #endif
 
+#if 1
+    // test timer
+    init_sample_timer(44100);
+
+    P2DIR |= BIT1;
+    P2SEL |= BIT1;
+    P2SEL2 &= ~BIT1;
+
+    TA1CTL = TASSEL_2 | MC_1;
+    TA1CCTL0 = 0;
+    TA1CCTL1 = OUTMOD_3;
+    TA1CCR0 = 400;
+    TA1CCR1 = 300;
+    // Clear the timer and enable timer interrupt
+
+    while(1)
+    	;
+#endif
+
     init_play("1.wav");
 
     while(play_loop()) {
@@ -327,4 +361,12 @@ int main(void) {
     }
 
     return 0;
+}
+
+
+// Timer A0 interrupt service routine
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void Timer_B (void)
+{
+	P1OUT ^= (BIT0);
 }
