@@ -7,6 +7,8 @@
 #include "pff.h"
 #include "integer.h"
 
+#include <msp430.h>
+#include <stdint.h>
 
 //#define DELAY_100US()	__delay_cycles(1600)  // ( 100us/(1/16Mhz) )  = 1600 ticks
 //#define SELECT()	P2OUT &= ~BIT0	/* CS = L */
@@ -163,6 +165,29 @@ DSTATUS disk_initialize ()
 /* Read partial sector                                                   */
 /*-----------------------------------------------------------------------*/
 
+void spi_skip(uint16_t cnt) {
+	uint16_t i = 0;
+	for (i = 0; i < cnt; i++) {
+		UCB0TXBUF = 0xFF; // dummy
+		while(UCB0STAT & UCBUSY) {
+			;
+		}
+	}
+}
+
+void spi_receive_buf(uint8_t *buf, uint16_t cnt) {
+	uint16_t i = 0;
+	for (i = 0; i < cnt; i++) {
+		UCB0TXBUF = 0xFF; // dummy
+		while(UCB0STAT & UCBUSY) {
+			;
+		}
+
+		*buf = UCB0RXBUF;
+		buf++;
+	}
+}
+
 DRESULT disk_readp (
 	BYTE *buff,		/* Pointer to the read buffer (NULL:Read bytes are forwarded to the stream) */
 	DWORD lba,		/* Sector number (LBA) */
@@ -190,14 +215,17 @@ DRESULT disk_readp (
 
 			/* Skip leading bytes */
 			if (ofs) {
-				do SPI_RECEIVE(); while (--ofs);
+				//do SPI_RECEIVE(); while (--ofs);
+				spi_skip(ofs);
 			}
 
 			/* Receive a part of the sector */
 			if (buff) {	/* Store data to the memory */
-				do {
+				/*do {
 					*buff++ = SPI_RECEIVE();
-				} while (--cnt);
+				} while (--cnt);*/
+				spi_receive_buf(buff, cnt);
+				buff += cnt;
 			} else {	/* Forward data to the outgoing stream (depends on the project) */
 				do {
 					//FORWARD(SPI_RECEIVE());
