@@ -1,8 +1,8 @@
 /**
  *  _____ ___  ___   ___   
- * |_   _/ _ \|   \ / _ \  
+ * |_   _/ _ \|   \ / _ \
  *   | || (_) | |) | (_) | 
- *   |_| \___/|___/ \___/ 
+ *   |_| \___/|___/ \___/
  *
  * TODO:
  * Verify SD bandwidth
@@ -21,6 +21,10 @@
 #include "pff2a/src/pff.h"
 
 #include "wav.h"
+
+#define SWAP_UINT16(x) _swap_bytes(x)
+//#define SWAP_UINT32(x) (((x) >> 24) | (((x) & 0x00FF0000) >> 8) | (((x) & 0x0000FF00) << 8) | ((x) << 24))
+#define SWAP_UINT32(x) (_swap_bytes(x & 0xFFFF) << 16) || (_swap_bytes(x >> 16))
 
 wav_fmt fmt;
 
@@ -154,22 +158,39 @@ void pwm_queue_init() {
 	pwm_queue_first = 0;
 }
 
+// DEBUG
+uint32_t bytes_played;
+
 void pwm_start() {
-#warn FIXME: NOT IMPLEMENTED!
+    P2DIR |= BIT1;
+    P2SEL |= BIT1;
+    P2SEL2 &= ~BIT1;
+
+    TA1CTL = TASSEL_2 | MC_1;
+    TA1CCTL0 = 0;
+    TA1CCTL1 = OUTMOD_3;
+    TA1CCR0 = 255;
+    TA1CCR1 = 256;
+
+    bytes_played = 0;
 }
 
 void pwm_irq() {
-#warn FIXME: handle getting behind
-
-#warn NOT IMPLEMENTED
 	if(pwm_queue_empty()) {
 		// disable irq - we are finished.
-
+	    TACCTL0 &= ~CCIE;
 		wav_active = false;
 	} else {
-		uint8_t a = pwm_queue_dequeue();
+		static uint8_t a = 0;
+		//a = pwm_queue_dequeue();
+
+		a++;
+		a &= 0xFF;
 
 		// play a
+		TA1CCR1 = a;
+
+		bytes_played++;
 	}
 }
 
@@ -179,6 +200,7 @@ void fill_pwm_queue() {
 	uint8_t i;
 	int32_t a = 0;
 
+	// Fill wav buffer
 	if (wav_buf_idx >= wav_buf + wav_buf_count) {
 		// load from SD. Enable interrupt during this operation.
 		_EINT();
@@ -194,6 +216,7 @@ void fill_pwm_queue() {
 		_DINT();
 	}
 
+	// Decode
 	for (i = 0; i < fmt.NumChannels; i++) {
 		if (fmt.BitsPerSample == 8) {
 			a += (int16_t) (*wav_buf_idx)-128;
@@ -335,28 +358,9 @@ int main(void) {
     led_off();
 #endif
 
-#if 1
-    // test timer
-    init_sample_timer(44100);
-
-    P2DIR |= BIT1;
-    P2SEL |= BIT1;
-    P2SEL2 &= ~BIT1;
-
-    TA1CTL = TASSEL_2 | MC_1;
-    TA1CCTL0 = 0;
-    TA1CCTL1 = OUTMOD_3;
-    TA1CCR0 = 400;
-    TA1CCR1 = 300;
-    // Clear the timer and enable timer interrupt
-
-    while(1)
-    	;
-#endif
-
     init_play("1.wav");
 
-    while(play_loop()) {
+    while(1/*play_loop()*/) {
     	;
     }
 
@@ -369,4 +373,5 @@ int main(void) {
 __interrupt void Timer_B (void)
 {
 	P1OUT ^= (BIT0);
+	pwm_irq();
 }
