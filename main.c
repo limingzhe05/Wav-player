@@ -163,6 +163,14 @@ void spi_init() {
   UCB0CTL1 &= ~UCSWRST;
 }
 
+void kill_sample_timer() {
+  __disable_interrupt();
+
+  TACCTL0 &= ~CCIE;
+
+  __enable_interrupt();
+}
+
 bool pwm_queue_full() {
   return pwm_queue_count == sizeof(pwm_queue);
 }
@@ -217,6 +225,7 @@ void pwm_irq() {
     // disable irq - we are finished.
     TACCTL0 &= ~CCIE;
     wav_active = false;
+    kill_sample_timer();
   } else {
     static uint8_t a = 0;
 #if 1
@@ -240,7 +249,7 @@ void fill_pwm_queue() {
 
   // Fill wav buffer
   if (wav_buf_idx >= wav_buf + wav_buf_count) {
-	  led_on();
+    led_on();
     // load from SD. Enable interrupt during this operation.
     _EINT();
 
@@ -410,30 +419,33 @@ int main(void) {
 #endif
 
   while(true) {
-	  P1DIR &= ~BIT3;
+    P1DIR &= ~BIT3;
+    P1REN |= BIT3;
+    P1OUT |= BIT3;
 
-	  init_play("1.wav");
+    while((P1IN & BIT3) != 0) {
+      // Wait for keypress
+      __no_operation();
+    }
+    while((P1IN & BIT3) == 0) {
+      // Wait for key release
+      __no_operation();
+    }
 
-	  while(play_loop()) {
-		;
-		if (P1IN & BIT3 == 0) {
-			// PWM Will automatically stop
-			while(P1IN & BIT3 == 0) {
-				// Wait for key release
-				__no_operation();
-			}
-			break;
-		}
-	  }
+    init_play("1.wav");
 
-	  while(P1IN & BIT3 == 1) {
-		  // Wait for keypress
-		  __no_operation();
-	  }
-		while(P1IN & BIT3 == 0) {
-			// Wait for key release
-			__no_operation();
-		}
+    while(play_loop()) {
+      ;
+      if ((P1IN & BIT3) == 0) {
+        // PWM Will automatically stop
+        kill_sample_timer();
+        while((P1IN & BIT3) == 0) {
+          // Wait for key release
+          __no_operation();
+        }
+        break;
+      }
+    }
   }
 
   return 0;
