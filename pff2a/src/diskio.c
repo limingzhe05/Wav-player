@@ -165,9 +165,8 @@ DSTATUS disk_initialize ()
 /* Read partial sector                                                   */
 /*-----------------------------------------------------------------------*/
 
-void spi_skip(uint16_t cnt) {
-	uint16_t i = 0;
-	for (i = 0; i < cnt; i++) {
+inline void spi_skip(uint16_t cnt) {
+	for (; cnt > 0; cnt--) {
 		UCB0TXBUF = 0xFF; // dummy
 		while(UCB0STAT & UCBUSY) {
 			;
@@ -175,9 +174,8 @@ void spi_skip(uint16_t cnt) {
 	}
 }
 
-void spi_receive_buf(uint8_t *buf, uint16_t cnt) {
-	uint16_t i = 0;
-	for (i = 0; i < cnt; i++) {
+inline void spi_receive_buf(uint8_t *buf, uint16_t cnt) {
+	for (; cnt > 0; cnt--) {
 		UCB0TXBUF = 0xFF; // dummy
 		while(UCB0STAT & UCBUSY) {
 			;
